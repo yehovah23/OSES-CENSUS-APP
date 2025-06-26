@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Enumeration - Online Self-Enumeration System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for Django form errors */
+        .errorlist {
+            color: #ef4444; /* Red-500 */
+            font-size: 0.875rem; /* text-sm */
+            margin-top: 0.25rem; /* mt-1 */
+            list-style: none;
+            padding-left: 0;
+        }
+        .form-field-error input,
+        .form-field-error select,
+        .form-field-error textarea {
+            border-color: #ef4444; /* Red-500 */
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-3xl w-full bg-white rounded-2xl shadow-xl p-6 lg:p-10">
+        <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-6 text-center">
+            Start Your Enumeration
+        </h1>
+        <p class="text-gray-700 text-lg mb-8 text-center">
+            Please fill out the form below to begin your self-enumeration. All fields are required unless otherwise noted.
+        </p>
+
+        {% if error_message %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <strong class="font-bold">Error!</strong>
+                <span class="block sm:inline">{{ error_message }}</span>
+            </div>
+        {% endif %}
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <h2 class="text-2xl font-bold text-blue-700 mb-4 border-b pb-2">Personal Information</h2>
+                </div>
+
+                {% for field in personal_form %}
+                    <div class="{% if field.errors %}form-field-error{% endif %}">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="errorlist">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                <div class="md:col-span-2">
+                    <h2 class="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 mt-8">Address Information</h2>
+                </div>
+
+                {% for field in address_form %}
+                    <div class="{% if field.errors %}form-field-error{% endif %}">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="errorlist">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+
+                <div class="md:col-span-2">
+                    <h2 class="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 mt-8">Enumeration Details</h2>
+                </div>
+                {% for field in enumeration_form %}
+                    <div class="{% if field.errors %}form-field-error{% endif %}">
+                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                             <p class="text-xs text-gray-500 mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                         {% for error in field.errors %}
+                             <p class="errorlist">{{ error }}</p>
+                         {% endfor %}
+                     </div>
+                {% endfor %}
+
+            </div>
+
+            <div class="mt-8 flex justify-center">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                    Submit Enumeration
+                </button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

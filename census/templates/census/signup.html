@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Online Self-Enumeration System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the message box */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            font-size: 1rem;
+            text-align: center;
+        }
+        .message-box.error {
+            background-color: #f44336; /* Red */
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-size: 1.5rem;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-50 to-pink-100 min-h-screen flex items-center justify-center p-4">
+    <div class="message-box" id="messageBox"></div>
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Generating image...</p>
+    </div>
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 lg:p-10">
+        <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-6 text-center">
+            Create Your Account
+        </h1>
+        <p class="text-gray-700 text-lg mb-8 text-center">
+            Register to start your self-enumeration process.
+        </p>
+
+        <form method="post" class="space-y-6" id="signupForm">
+            {% csrf_token %}
+
+            {# STEP 1: Phone Number and User Details Input #}
+            <div id="step1" class="space-y-6">
+                <div>
+                    <label for="national_id" class="block text-sm font-medium text-gray-700">National ID</label>
+                    <input type="text" name="national_id" id="national_id" placeholder="e.g., 22U/12345/PS" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                    <input type="text" name="first_name" id="first_name" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                    <input type="text" name="last_name" id="last_name" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email Address (Optional)</label>
+                    <input type="email" name="email" id="email" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="phone_number" class="block text-sm font-medium text-gray-700">Phone Number (e.g., +256771234567)</label>
+                    <input type="tel" name="phone_number" id="phone_number" placeholder="e.g., +256771234567" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" name="password" id="password" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="password_confirm" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                    <input type="password" name="password_confirm" id="password_confirm" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div class="mt-8">
+                    <button type="button" id="sendOtpButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                        Send Verification Code
+                    </button>
+                </div>
+            </div>
+
+            {# STEP 2: OTP and Face Capture Verification #}
+            <div id="step2" class="hidden space-y-6">
+                <div>
+                    <label for="otp_code" class="block text-sm font-medium text-gray-700">Verification Code</label>
+                    <input type="text" name="otp_code" id="otp_code" placeholder="Enter the 6-digit code" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm" required>
+                </div>
+                <div class="text-center text-gray-600 text-sm mt-2" id="otpTimer">OTP expires in 5:00</div>
+                <button type="button" id="resendOtpButton" class="w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md mt-2" disabled>
+                    Resend Code
+                </button>
+
+                <!-- Face Capture Section -->
+                <div class="md:col-span-2">
+                    <h2 class="text-2xl font-bold text-purple-700 mb-4 border-b pb-2 mt-8">Face Capture</h2>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Please allow webcam access and capture your face for verification.
+                    </p>
+                    <div class="flex flex-col items-center space-y-4">
+                        <video id="webcamVideo" class="w-full max-w-xs rounded-lg shadow-md border border-gray-300" autoplay playsinline></video>
+                        <button type="button" id="captureButton" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                            Capture Face
+                        </button>
+                        <canvas id="faceCanvas" class="hidden"></canvas>
+                        <img id="capturedImage" class="w-full max-w-xs rounded-lg shadow-md border border-gray-300 hidden" alt="Captured Face">
+                        <input type="hidden" name="face_image_data" id="faceImageData">
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button type="submit" id="verifyOtpAndSignupButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                        Verify Code & Sign Up
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <p class="text-center text-gray-600 text-sm mt-6">
+            Already have an account? <a href="/login/" class="text-purple-600 hover:underline">Log In</a>
+        </p>
+    </div>
+
+    <script>
+        const signupForm = document.getElementById('signupForm');
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const sendOtpButton = document.getElementById('sendOtpButton');
+        const verifyOtpAndSignupButton = document.getElementById('verifyOtpAndSignupButton');
+        const resendOtpButton = document.getElementById('resendOtpButton');
+        const otpTimer = document.getElementById('otpTimer');
+        const nationalIdInput = document.getElementById('national_id');
+        const firstNameInput = document.getElementById('first_name');
+        const lastNameInput = document.getElementById('last_name');
+        const emailInput = document.getElementById('email');
+        const phoneNumberInput = document.getElementById('phone_number');
+        const passwordInput = document.getElementById('password');
+        const passwordConfirmInput = document.getElementById('password_confirm');
+        const otpCodeInput = document.getElementById('otp_code');
+
+        // Face capture elements (already in your signup.html)
+        const webcamVideo = document.getElementById('webcamVideo');
+        const captureButton = document.getElementById('captureButton');
+        const faceCanvas = document.getElementById('faceCanvas');
+        const capturedImage = document.getElementById('capturedImage');
+        const faceImageDataInput = document.getElementById('faceImageData');
+
+        const messageBox = document.getElementById('messageBox');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        let stream; // To store the webcam stream
+        let otpCountdownInterval;
+        const OTP_EXPIRATION_SECONDS = 300; // 5 minutes
+
+        // Utility functions
+        function showMessage(message, type = 'success') {
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000);
+        }
+
+        function showLoading(message = 'Loading...') {
+            loadingMessage.textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                // Refactored for-loop to for-of loop
+                const cookies = document.cookie.split(';');
+                for (const cookie of cookies) { // Changed from traditional for loop
+                    const trimmedCookie = cookie.trim();
+                    if (trimmedCookie.startsWith(name + '=')) { // Use startsWith for cleaner check
+                        cookieValue = decodeURIComponent(trimmedCookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        // Countdown timer for OTP
+        function startOtpCountdown() {
+            let timeLeft = OTP_EXPIRATION_SECONDS;
+            resendOtpButton.disabled = true;
+            otpTimer.classList.remove('text-red-500'); // Remove red if it was expired
+
+            clearInterval(otpCountdownInterval); // Clear any existing interval
+
+            otpCountdownInterval = setInterval(() => {
+                const minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                seconds = seconds < 10 ? '0' + seconds : seconds;
+                otpTimer.textContent = `OTP expires in ${minutes}:${seconds}`;
+
+                if (timeLeft <= 60) { // Change color to red in the last minute
+                    otpTimer.classList.add('text-red-500');
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(otpCountdownInterval);
+                    otpTimer.textContent = "OTP expired! Please resend.";
+                    resendOtpButton.disabled = false;
+                    otpTimer.classList.add('text-red-500');
+                }
+                timeLeft--;
+            }, 1000);
+        }
+
+        // OTP Sending Logic
+        sendOtpButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const nationalId = nationalIdInput.value.trim();
+            const firstName = firstNameInput.value.trim();
+            const lastName = lastNameInput.value.trim();
+            const email = emailInput.value.trim();
+            const phoneNumber = phoneNumberInput.value.trim();
+            const password = passwordInput.value;
+            const passwordConfirm = passwordConfirmInput.value;
+
+            // Basic Client-side validation before sending OTP
+            if (!nationalId || !firstName || !lastName || !phoneNumber || !password || !passwordConfirm) {
+                showMessage('Please fill in all required fields.', 'error');
+                return;
+            }
+            if (password !== passwordConfirm) {
+                showMessage('Passwords do not match!', 'error');
+                return;
+            }
+            // Refactored: Use \d for digits
+            const nationalIdRegex = /^\d{2}[A-Z]\/\d{5}\/[A-Z]{2}$/;
+            if (!nationalIdRegex.test(nationalId)) {
+                showMessage('National ID must be in the format: 22U/12345/PS', 'error');
+                return;
+            }
+            // Refactored: Use \d for digits
+            const phoneRegex = /^\+?\d{9,14}$/;
+            if (!phoneRegex.test(phoneNumber)) {
+                showMessage('Phone number must be in E.164 format, e.g., +256771234567.', 'error');
+                return;
+            }
+
+            showLoading('Sending verification code...');
+
+            try {
+                const response = await fetch('/request-otp/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify({
+                        national_id: nationalId,
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: email,
+                        phone_number: phoneNumber,
+                        password: password, // Store password temporarily in session, will be hashed on final save
+                    }),
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Transition to Step 2
+                    step1.classList.add('hidden');
+                    step2.classList.remove('hidden');
+                    startWebcam(); // Start webcam when moving to OTP step
+                    startOtpCountdown(); // Start OTP timer
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Error sending OTP:', error);
+            }
+        });
+
+        // OTP Resend Logic
+        resendOtpButton.addEventListener('click', async () => {
+            const phoneNumber = phoneNumberInput.value.trim();
+            if (!phoneNumber) {
+                showMessage('Please enter your phone number first.', 'error');
+                return;
+            }
+
+            showLoading('Resending verification code...');
+            try {
+                const response = await fetch('/resend-otp/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify({ phone_number: phoneNumber }),
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    startOtpCountdown(); // Restart timer
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Error resending OTP:', error);
+            }
+        });
+
+
+        // Final Verification and Signup Logic
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent default form submission initially
+
+            const phoneNumber = phoneNumberInput.value.trim(); // Get from step 1 input
+            const otpCode = otpCodeInput.value.trim();
+            const faceImageData = faceImageDataInput.value;
+
+            if (!otpCode) {
+                showMessage('Please enter the OTP code.', 'error');
+                return;
+            }
+            if (!faceImageData) {
+                showMessage('Please capture your face before signing up.', 'error');
+                return;
+            }
+
+            showLoading('Verifying code and registering...');
+
+            try {
+                const response = await fetch('/verify-otp/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify({
+                        phone_number: phoneNumber,
+                        otp_code: otpCode,
+                        face_image_data: faceImageData // This can be sent to backend for potential storage
+                    }),
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // OTP and Face verified successfully.
+                    // Now, submit the entire original signup form to the Django backend
+                    // for final user creation, using a hidden form submission or direct redirect.
+                    // The backend signup_view will retrieve the data from session.
+
+                    // Create a temporary form to POST to the original signup_view
+                    const tempForm = document.createElement('form');
+                    tempForm.method = 'POST';
+                    tempForm.action = '/signup/'; // Action to your final signup_view
+
+                    // Append CSRF token
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrfmiddlewaretoken';
+                    csrfInput.value = csrftoken;
+                    tempForm.appendChild(csrfInput);
+
+                    // Submit the temp form
+                    document.body.appendChild(tempForm);
+                    tempForm.submit();
+
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showMessage('Network error during verification. Please try again.', 'error');
+                console.error('Error verifying OTP:', error);
+            }
+        });
+
+        // Webcam logic (from previous updates, ensure it runs for Step 2)
+        function startWebcam() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                showLoading('Starting webcam...');
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(s => {
+                        stream = s;
+                        webcamVideo.srcObject = stream;
+                        hideLoading();
+                        showMessage('Webcam access granted!', 'success');
+                    })
+                    .catch(err => {
+                        hideLoading();
+                        showMessage('Error accessing webcam: ' + err.message, 'error');
+                        console.error('Error accessing webcam:', err);
+                    });
+            } else {
+                showMessage('Webcam not supported by your browser.', 'error');
+            }
+        }
+
+        captureButton.addEventListener('click', () => {
+            if (stream) {
+                const context = faceCanvas.getContext('2d');
+                faceCanvas.width = webcamVideo.videoWidth;
+                faceCanvas.height = webcamVideo.videoHeight;
+                context.drawImage(webcamVideo, 0, 0, faceCanvas.width, faceCanvas.height);
+                const imageData = faceCanvas.toDataURL('image/png');
+                capturedImage.src = imageData;
+                capturedImage.classList.remove('hidden');
+                faceImageDataInput.value = imageData;
+                showMessage('Face captured successfully!', 'success');
+            } else {
+                showMessage('Webcam not active. Please allow access first.', 'error');
+            }
+        });
+
+        // Stop webcam when navigating away
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>

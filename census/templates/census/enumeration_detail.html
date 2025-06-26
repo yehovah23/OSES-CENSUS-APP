@@ -1,0 +1,48 @@
+{% extends 'census/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm rounded-lg">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center rounded-top-lg">
+            <h2 class="h4 mb-0">Enumeration #{{ enumeration.id }}</h2>
+            <span class="badge bg-{{ enumeration.status == 'verified'|yesno:'success' }}{{ enumeration.status == 'submitted'|yesno:',info' }}{{ enumeration.status == 'draft'|yesno:',secondary' }}{{ enumeration.status == 'rejected'|yesno:',danger' }} text-uppercase fs-6 px-3 py-2 rounded-pill">
+                {{ enumeration.get_status_display }}
+            </span>
+        </div>
+        <div class="card-body p-4 p-md-5">
+            <div class="row g-4">
+                <div class="col-12 col-md-6">
+                    <h4 class="text-primary mb-3 border-bottom pb-2">Personal Information</h4>
+                    <p class="mb-2"><strong>Name:</strong> {{ enumeration.personal_info.first_name }} {{ enumeration.personal_info.last_name }} {% if enumeration.personal_info.middle_name %}({{ enumeration.personal_info.middle_name }}){% endif %}</p>
+                    <p class="mb-2"><strong>Date of Birth:</strong> {{ enumeration.personal_info.date_of_birth|date:"F j, Y" }}</p>
+                    <p class="mb-2"><strong>Gender:</strong> {{ enumeration.personal_info.get_gender_display }}</p>
+                    <p class="mb-2"><strong>Marital Status:</strong> {{ enumeration.personal_info.get_marital_status_display }}</p>
+                    <p class="mb-2"><strong>Nationality:</strong> {{ enumeration.personal_info.nationality }}</p>
+                </div>
+                <div class="col-12 col-md-6">
+                    <h4 class="text-primary mb-3 border-bottom pb-2">Address Information</h4>
+                    <p class="mb-2"><strong>Region:</strong> {{ enumeration.address_info.region }}</p>
+                    <p class="mb-2"><strong>District:</strong> {{ enumeration.address_info.district }}</p>
+                    <p class="mb-2"><strong>County:</strong> {{ enumeration.address_info.county }}</p>
+                    <p class="mb-2"><strong>Sub-county:</strong> {{ enumeration.address_info.sub_county }}</p>
+                    <p class="mb-2"><strong>Parish:</strong> {{ enumeration.address_info.parish }}</p>
+                    <p class="mb-2"><strong>Village:</strong> {{ enumeration.address_info.village }}</p>
+                    {% if enumeration.address_info.street %}<p class="mb-2"><strong>Street:</strong> {{ enumeration.address_info.street }}</p>{% endif %}
+                    {% if enumeration.address_info.house_number %}<p class="mb-2"><strong>House No.:</strong> {{ enumeration.address_info.house_number }}</p>{% endif %}
+                    <p class="mb-2"><strong>Residence Type:</strong> {{ enumeration.address_info.get_residence_type_display }}</p>
+                    {% if enumeration.address_info.location_description %}<p class="mb-2"><strong>Description:</strong> {{ enumeration.address_info.location_description }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="mt-5 d-flex justify-content-start gap-3">
+                <a href="{% url 'enumeration-update' enumeration.pk %}" class="btn btn-warning px-4 py-2">
+                    <i class="bi bi-pencil-square me-2"></i>Edit
+                </a>
+                <a href="{% url 'enumeration-list' %}" class="btn btn-secondary px-4 py-2">
+                    <i class="bi bi-arrow-left me-2"></i>Back to List
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

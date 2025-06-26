@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Online Self-Enumeration System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the message box */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            font-size: 1rem;
+            text-align: center;
+        }
+        .message-box.error {
+            background-color: #f44336; /* Red */
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-size: 1.5rem;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    <div class="message-box" id="messageBox"></div>
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Loading...</p>
+    </div>
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 lg:p-10">
+        <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 mb-6 text-center">
+            Login to Your Account
+        </h1>
+        <p class="text-gray-700 text-lg mb-8 text-center">
+            Enter your National ID and capture your face for authentication.
+        </p>
+
+        {% if error_message %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+                <strong class="font-bold">Error!</strong>
+                <span class="block sm:inline">{{ error_message }}</span>
+            </div>
+        {% endif %}
+
+        <form method="post" class="space-y-6" id="loginForm">
+            {% csrf_token %}
+            <div>
+                <label for="national_id" class="block text-sm font-medium text-gray-700">National ID</label>
+                <input type="text" name="national_id" id="national_id" placeholder="e.g., 22U/12345/PS" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" required>
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Password (Fallback)</label>
+                <input type="password" name="password" id="password" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <!-- Face Capture Section -->
+            <div class="md:col-span-2">
+                <h2 class="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 mt-8">Face Capture for Authentication</h2>
+                <p class="text-gray-600 text-sm mb-4">
+                    Please allow webcam access and capture your face. This will be compared with your registered face.
+                </p>
+                <div class="flex flex-col items-center space-y-4">
+                    <video id="webcamVideo" class="w-full max-w-xs rounded-lg shadow-md border border-gray-300" autoplay playsinline></video>
+                    <button type="button" id="captureButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                        Capture Face
+                    </button>
+                    <canvas id="faceCanvas" class="hidden"></canvas>
+                    <img id="capturedImage" class="w-full max-w-xs rounded-lg shadow-md border border-gray-300 hidden" alt="Captured Face">
+                    <input type="hidden" name="face_image_data" id="faceImageData">
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-lg">
+                    Log In
+                </button>
+            </div>
+        </form>
+
+        <p class="text-center text-gray-600 text-sm mt-6">
+            Don't have an account? <a href="/signup/" class="text-blue-600 hover:underline">Sign Up</a>
+        </p>
+    </div>
+
+    <script>
+        const webcamVideo = document.getElementById('webcamVideo');
+        const captureButton = document.getElementById('captureButton');
+        const faceCanvas = document.getElementById('faceCanvas');
+        const capturedImage = document.getElementById('capturedImage');
+        const faceImageDataInput = document.getElementById('faceImageData');
+        const loginForm = document.getElementById('loginForm');
+        const messageBox = document.getElementById('messageBox');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        let stream; // To store the webcam stream
+
+        // Function to display messages
+        function showMessage(message, type = 'success') {
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000); // Hide after 5 seconds
+        }
+
+        // Function to show/hide loading overlay
+        function showLoading(message = 'Loading...') {
+            loadingMessage.textContent = message;
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        // Request access to webcam
+        async function startWebcam() {
+            try {
+                showLoading('Requesting webcam access...');
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                webcamVideo.srcObject = stream;
+                hideLoading();
+                showMessage('Webcam access granted!', 'success');
+            } catch (err) {
+                hideLoading();
+                showMessage('Error accessing webcam: ' + err.message, 'error');
+                console.error('Error accessing webcam:', err);
+            }
+        }
+
+        // Capture face from webcam
+        captureButton.addEventListener('click', () => {
+            if (stream) {
+                const context = faceCanvas.getContext('2d');
+                // Set canvas dimensions to match video feed
+                faceCanvas.width = webcamVideo.videoWidth;
+                faceCanvas.height = webcamVideo.videoHeight;
+                context.drawImage(webcamVideo, 0, 0, faceCanvas.width, faceCanvas.height);
+
+                // Get image data as base64
+                const imageData = faceCanvas.toDataURL('image/png');
+                capturedImage.src = imageData;
+                capturedImage.classList.remove('hidden');
+                faceImageDataInput.value = imageData; // Store in hidden input
+
+                showMessage('Face captured successfully!', 'success');
+            } else {
+                showMessage('Webcam not active. Please allow access first.', 'error');
+            }
+        });
+
+        // Start webcam when the page loads
+        window.addEventListener('load', startWebcam);
+
+        // Stop webcam when navigating away
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Client-side validation for form submission
+        loginForm.addEventListener('submit', (event) => {
+            const nationalId = document.getElementById('national_id').value;
+            const password = document.getElementById('password').value;
+            const faceImageData = document.getElementById('faceImageData').value;
+
+            // If neither password nor face image is provided, prevent submission
+            if (!password && !faceImageData) {
+                showMessage('Please provide your password or capture your face for authentication.', 'error');
+                event.preventDefault();
+                return;
+            }
+
+            // Basic National ID format validation (client-side)
+            const nationalIdRegex = /^[0-9]{2}[A-Z]{1}\/[0-9]{5}\/[A-Z]{2}$/;
+            if (!nationalIdRegex.test(nationalId)) {
+                showMessage('National ID must be in the format: 22U/12345/PS', 'error');
+                event.preventDefault();
+                return;
+            }
+            // If all client-side checks pass, form will submit
+        });
+    </script>
+</body>
+</html>
