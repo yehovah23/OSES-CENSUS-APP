@@ -20,11 +20,10 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-# Import OTP related utilities and models
-from .utils import create_and_send_otp
+# Import OTP related utilities and models - REMOVED create_and_send_otp, OTP
 from .models import (
     EnumerationData, CustomUser, AddressInformation, PersonalInformation, Language,
-    SystemSetting, AuditLog, EducationInformation, EmploymentInformation, OTP
+    SystemSetting, AuditLog, EducationInformation, EmploymentInformation,
 )
 from .serializers import (
     EnumerationDataSerializer, AuditLogSerializer, UserSerializer, AddressInformationSerializer,
@@ -34,14 +33,14 @@ from .serializers import (
 )
 from .forms import (
     EnumerationDataForm, PersonalInformationForm, AddressInformationForm,
-    CustomUserCreationForm, OTPVerificationForm,
+    CustomUserCreationForm, # REMOVED OTPVerificationForm
     EducationInformationForm, EmploymentInformationForm
 )
 
 # --- Constants for duplicated literals ---
 ERROR_UNEXPECTED = 'An unexpected error occurred.'
-ERROR_INVALID_JSON = 'Invalid JSON.'
-ERROR_INVALID_METHOD = 'Invalid request method.'
+ERROR_INVALID_JSON = 'Invalid JSON.' # Kept as placeholder if other APIs need it
+ERROR_INVALID_METHOD = 'Invalid request method.' # Kept as placeholder if other APIs need it
 TEMPLATE_ENUMERATION_FORM = 'census/enumeration_form.html'
 # --- End Constants ---
 
@@ -51,148 +50,32 @@ def home(request):
     return render(request, 'census/home.html')
 
 def signup_view(request):
-    # This view will handle the final user creation after OTP verification
-    # The OTP request and verification will be handled by separate AJAX views
+    """
+    Handles user signup directly without OTP verification.
+    """
     if request.method == 'POST':
-        # Retrieve data from session which was stored after OTP verification
-        signup_data = request.session.get('signup_data')
-        if not signup_data:
-            messages.error(request, "Session expired or no signup data found. Please restart the signup process.")
-            return redirect('signup') # Redirect to the start of signup
-
-        # Ensure the phone number from session is marked as verified
-        phone_number = signup_data.get('phone_number')
-        if not OTP.objects.filter(phone_number=phone_number, is_verified=True, expires_at__gt=timezone.now()).exists():
-            messages.error(request, "Phone number not verified. Please complete OTP verification.")
-            return redirect('signup')
-
-        # Use CustomUserCreationForm to save the user from session data
-        form = CustomUserCreationForm(signup_data)
+        form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            # Create the user here
             user = form.save(commit=False)
-            user.set_password(signup_data.get('password')) # Set password as save(commit=False) doesn't hash it
-            user.is_verified = True # Mark as verified after successful OTP and creation
+            # Since OTP is removed, we consider the user verified upon successful signup.
+            # If you want a different verification method (e.g., email confirmation link),
+            # you would implement it here and set is_verified to False initially.
+            user.is_verified = True
             user.save()
 
-            # Clear session data
-            del request.session['signup_data']
             messages.success(request, "Account created successfully! You can now log in.")
-            return redirect('login') # Redirect to login page
-
+            return redirect('login') # Redirect to login page after successful signup
         else:
-            # This case should ideally not happen if data from session was already validated
-            # But handle it for robustness
-            print(f"Error saving user from session data: {form.errors}")
-            messages.error(request, "An error occurred during account creation. Please try again.")
-            return redirect('signup')
+            # Form is not valid, re-render the form with errors
+            print(f"Signup Form Errors: {form.errors}") # For debugging
+            messages.error(request, "Please correct the errors below.")
+            return render(request, 'census/signup.html', {'form': form})
     else:
         # Initial GET request for signup
         form = CustomUserCreationForm()
-        # Initial state: only display the main signup form
-        return render(request, 'census/signup.html', {'form': form, 'otp_sent': False})
+    return render(request, 'census/signup.html', {'form': form})
 
-
-def request_otp(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            phone_number = data.get('phone_number')
-            # Add basic validation for phone number format
-            if not phone_number:
-                return JsonResponse({'success': False, 'message': 'Phone number is required.'}, status=400)
-
-            # Check if user with this phone number already exists and is verified
-            if CustomUser.objects.filter(phone_number=phone_number, is_verified=True).exists():
-                return JsonResponse({'success': False, 'message': 'This phone number is already registered and verified.'}, status=409)
-
-            # Check if an unverified user exists and use their national_id for form data.
-            # This prevents re-registration for an existing but unverified account.
-            existing_unverified_user = CustomUser.objects.filter(phone_number=phone_number, is_verified=False).first()
-            if existing_unverified_user:
-                data['national_id'] = existing_unverified_user.national_id
-                data['first_name'] = existing_unverified_user.first_name
-                data['last_name'] = existing_unverified_user.last_name
-                data['email'] = existing_unverified_user.email
-                # We won't pre-fill password for security, user will re-enter or create.
-
-            # Store the preliminary signup data in session
-            request.session['signup_data_pre_otp'] = data
-            request.session.modified = True
-
-            # Create and send OTP
-            otp_instance = create_and_send_otp(phone_number)
-
-            if otp_instance:
-                return JsonResponse({'success': True, 'message': 'OTP sent successfully. Please check your phone.'})
-            else:
-                return JsonResponse({'success': False, 'message': 'Failed to send OTP. Please try again.'}, status=500)
-
-        except json.JSONDecodeError:
-            return JsonResponse({'success': False, 'message': ERROR_INVALID_JSON}, status=400)
-        except Exception as e:
-            print(f"Error in request_otp: {e}")
-            return JsonResponse({'success': False, 'message': ERROR_UNEXPECTED}, status=500)
-    return JsonResponse({'success': False, 'message': ERROR_INVALID_METHOD}, status=405)
-
-
-def verify_otp(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            phone_number = data.get('phone_number')
-            otp_code = data.get('otp_code')
-
-            if not phone_number or not otp_code:
-                return JsonResponse({'success': False, 'message': 'Phone number and OTP are required.'}, status=400)
-
-            # Verify OTP using the form
-            otp_form = OTPVerificationForm({'phone_number': phone_number, 'code': otp_code})
-            if otp_form.is_valid():
-                # Retrieve the preliminary signup data from session
-                signup_data_pre_otp = request.session.get('signup_data_pre_otp')
-                if not signup_data_pre_otp or signup_data_pre_otp.get('phone_number') != phone_number:
-                    return JsonResponse({'success': False, 'message': 'Session expired or invalid phone number for verification. Please restart signup.'}, status=400)
-
-                # Store all collected signup data including passwords in session for final signup_view
-                request.session['signup_data'] = signup_data_pre_otp
-                request.session.modified = True
-
-                # Mark OTP as verified (already done in OTPVerificationForm.clean())
-                return JsonResponse({'success': True, 'message': 'OTP verified successfully. Redirecting to final registration...'})
-            else:
-                return JsonResponse({'success': False, 'message': otp_form.errors.as_text()}, status=400)
-        except json.JSONDecodeError:
-            return JsonResponse({'success': False, 'message': ERROR_INVALID_JSON}, status=400)
-        except Exception as e:
-            print(f"Error in verify_otp: {e}")
-            return JsonResponse({'success': False, 'message': ERROR_UNEXPECTED}, status=500)
-    return JsonResponse({'success': False, 'message': ERROR_INVALID_METHOD}, status=405)
-
-
-def resend_otp(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            phone_number = data.get('phone_number')
-
-            if not phone_number:
-                return JsonResponse({'success': False, 'message': 'Phone number is required.'}, status=400)
-
-            # You might want to add rate limiting here to prevent abuse
-            # e.g., check last OTP sent time for this phone number
-
-            otp_instance = create_and_send_otp(phone_number)
-            if otp_instance:
-                return JsonResponse({'success': True, 'message': 'New OTP sent successfully. Check your phone.'})
-            else:
-                return JsonResponse({'success': False, 'message': 'Failed to resend OTP. Please try again later.'}, status=500)
-        except json.JSONDecodeError:
-            return JsonResponse({'success': False, 'message': ERROR_INVALID_JSON}, status=400)
-        except Exception as e:
-            print(f"Error in resend_otp: {e}")
-            return JsonResponse({'success': False, 'message': ERROR_UNEXPECTED}, status=500)
-    return JsonResponse({'success': False, 'message': ERROR_INVALID_METHOD}, status=405)
+# REMOVED request_otp, verify_otp, resend_otp functions
 
 
 # --- Helper Functions for login_view to reduce complexity ---
@@ -200,7 +83,8 @@ def resend_otp(request):
 def _render_login_error(request, message, form=None):
     """Helper to render the login page with an error message."""
     if form is None:
-        form = CustomUserCreationForm() # Provide a default form if none passed
+        # Use CustomUserCreationForm for consistency, though login form isn't created directly here
+        form = CustomUserCreationForm()
     messages.error(request, message)
     return render(request, 'census/login.html', {'form': form, 'error_message': message})
 
@@ -303,7 +187,7 @@ def enumeration_create(request):
                     return redirect('enumeration-detail', pk=enumeration.pk)
             except Exception as e:
                 print(f"Database save error: {e}")
-                return render(request, TEMPLATE_ENUMERATION_FORM, { # Replaced literal
+                return render(request, TEMPLATE_ENUMERATION_FORM, {
                     'personal_form': personal_form,
                     'address_form': address_form,
                     'education_form': education_form,
@@ -317,7 +201,7 @@ def enumeration_create(request):
             print(f"Education Form Errors: {education_form.errors}")
             print(f"Employment Form Errors: {employment_form.errors}")
             print(f"Enumeration Form Errors: {enumeration_form.errors}")
-            return render(request, TEMPLATE_ENUMERATION_FORM, { # Replaced literal
+            return render(request, TEMPLATE_ENUMERATION_FORM, {
                 'personal_form': personal_form,
                 'address_form': address_form,
                 'education_form': education_form,
@@ -331,7 +215,7 @@ def enumeration_create(request):
         employment_form = EmploymentInformationForm(prefix='employment_info')
         enumeration_form = EnumerationDataForm()
 
-    return render(request, TEMPLATE_ENUMERATION_FORM, { # Replaced literal
+    return render(request, TEMPLATE_ENUMERATION_FORM, {
         'personal_form': personal_form,
         'address_form': address_form,
         'education_form': education_form,
@@ -451,7 +335,7 @@ class EnumerationDataViewSet(viewsets.ModelViewSet):
 class EnumerationUpdateView(LoginRequiredMixin, UpdateView):
     model = EnumerationData
     form_class = EnumerationDataForm
-    template_name = TEMPLATE_ENUMERATION_FORM # Replaced literal
+    template_name = TEMPLATE_ENUMERATION_FORM
     success_url = reverse_lazy('enumeration-list')
 
     def get_context_data(self, **kwargs):
