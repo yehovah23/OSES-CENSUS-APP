@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-am&i07#g%oc_471##@&@bpj39!lxp1k=)yq-5gj^ft0lg%dna*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'oses-census-app-1.onrender.com', '.onrender.com']
 
 
 # Application definition
