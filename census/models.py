@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager, Permission
 from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.conf import settings
-import random # Import random for OTP generation
+# Removed random import as it was only for OTP generation
 
 # Define a custom manager for CustomUser
 class CustomUserManager(BaseUserManager):
@@ -39,6 +39,8 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True) # <-- Explicitly set unique=True here
     national_id = models.CharField(max_length=20, unique=True)
     phone_number = models.CharField(max_length=15, unique=True)
+    # is_verified field remains, but its usage will now be simplified to direct signup.
+    # If email verification is added later, this field would be used for that.
     is_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email' # We use email for login
@@ -59,29 +61,7 @@ class CustomUser(AbstractUser):
         return self.email
 
 
-# New OTP Model (remains unchanged)
-class OTP(models.Model):
-    phone_number = models.CharField(max_length=15, db_index=True)
-    code = models.CharField(max_length=10)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    is_verified = models.BooleanField(default=False)
-
-    def save(self, *args, **kwargs):
-        if not self.expires_at:
-            # Ensure settings.OTP_EXPIRATION_MINUTES is defined in your settings.py
-            self.expires_at = timezone.now() + timezone.timedelta(minutes=settings.OTP_EXPIRATION_MINUTES)
-        super().save(*args, **kwargs)
-
-    def is_valid(self):
-        return (
-            not self.is_verified and
-            self.expires_at > timezone.now()
-        )
-
-    def __str__(self):
-        return f"OTP for {self.phone_number}: {self.code} (Expires: {self.expires_at})"
-
+# REMOVED OTP Model completely
 
 class EnumerationData(models.Model):
     STATUS_CHOICES = [
@@ -102,16 +82,14 @@ class EnumerationData(models.Model):
         choices=STATUS_CHOICES,
         default='draft'
     )
-    # Re-added null=True for TextField as it's typically desired with blank=True for consistency
     verification_notes = models.TextField(blank=True, null=True)
     verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True,  # null=True required for on_delete=models.SET_NULL
+        null=True,
         blank=True,
         related_name='verified_enumerations'
     )
-    # Re-added null=True for DateTimeField when blank=True is present
     verification_date = models.DateTimeField(blank=True, null=True)
 
     class Meta:
@@ -144,7 +122,6 @@ class PersonalInformation(models.Model):
         related_name='personal_info'
     )
     first_name = models.CharField(max_length=50)
-    # Re-added null=True for CharField when blank=True is present
     middle_name = models.CharField(max_length=50, blank=True, null=True)
     last_name = models.CharField(max_length=50)
     date_of_birth = models.DateField()
@@ -182,13 +159,10 @@ class AddressInformation(models.Model):
     sub_county = models.CharField(max_length=50)
     parish = models.CharField(max_length=50)
     village = models.CharField(max_length=50)
-    # Re-added null=True for CharField when blank=True is present
     street = models.CharField(max_length=100, blank=True, null=True)
-    # Re-added null=True for CharField when blank=True is present
     house_number = models.CharField(max_length=20, blank=True, null=True)
     location_description = models.TextField(
         blank=True,
-        # Re-added null=True for TextField when blank=True is present
         null=True,
         help_text="User's description of their location"
     )
@@ -232,13 +206,11 @@ class EducationInformation(models.Model):
         max_length=15,
         choices=EDUCATION_LEVEL_CHOICES
     )
-    # Re-added null=True for CharField when blank=True is present
     institution_name = models.CharField(
         max_length=100,
         blank=True,
         null=True
     )
-    # Re-added null=True for SmallIntegerField when blank=True is present
     completion_year = models.SmallIntegerField(blank=True, null=True)
     literacy_status = models.CharField(
         max_length=10,
@@ -276,19 +248,16 @@ class EmploymentInformation(models.Model):
         max_length=15,
         choices=EMPLOYMENT_STATUS_CHOICES
     )
-    # Re-added null=True for CharField when blank=True is present
     occupation = models.CharField(
         max_length=100,
         blank=True,
         null=True
     )
-    # Re-added null=True for CharField when blank=True is present
     industry = models.CharField(
         max_length=100,
         blank=True,
         null=True
     )
-    # Re-added null=True for CharField when blank=True is present
     employer_name = models.CharField(
         max_length=100,
         blank=True,
@@ -326,7 +295,6 @@ class SystemSetting(models.Model):
         help_text='Setting key/name'
     )
     value = models.TextField()
-    # Re-added null=True for TextField when blank=True is present
     description = models.TextField(blank=True, null=True)
     is_public = models.BooleanField(
         default=False,
@@ -335,7 +303,7 @@ class SystemSetting(models.Model):
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True,  # null=True required for on_delete=models.SET_NULL
+        null=True,
         blank=True
     )
     updated_at = models.DateTimeField(auto_now=True)
@@ -353,19 +321,15 @@ class AuditLog(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
-        null=True,  # null=True required for on_delete=models.SET_NULL
+        null=True,
         blank=True
     )
     action = models.CharField(max_length=50)
     table_name = models.CharField(max_length=50)
     record_id = models.BigIntegerField()
-    # Re-added null=True for JSONField when blank=True is present
     old_values = models.JSONField(blank=True, null=True)
-    # Re-added null=True for JSONField when blank=True is present
     new_values = models.JSONField(blank=True, null=True)
-    # Re-added null=True as required for GenericIPAddressField when blank=True
     ip_address = models.GenericIPAddressField(blank=True, null=True)
-    # Re-added null=True for TextField when blank=True is present
     user_agent = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
